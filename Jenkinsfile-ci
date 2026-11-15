@@ -1,0 +1,50 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven_3_10_0'
+    }
+
+    options {
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+        timestamps()
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build and test') {
+            steps {
+                sh 'mvn --batch-mode --no-transfer-progress clean verify'
+            }
+            post {
+                always {
+                    junit testResults: '**/target/surefire-reports/*.xml,**/target/failsafe-reports/*.xml', allowEmptyResults: true
+                }
+            }
+        }
+
+        stage('Archive artifact') {
+            steps {
+                archiveArtifacts artifacts: '**/target/*.jar,**/target/*.war', allowEmptyArchive: false, fingerprint: true
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'CI completed: build passed, tests passed, and the artifact was archived. Deployment is not configured.'
+        }
+        failure {
+            echo 'CI failed. Review the stage logs and console output.'
+        }
+        always {
+            deleteDir()
+        }
+    }
+}
